@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BMI Calculator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f7fc;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .container {
+            max-width: 600px;
+            margin-top: 50px;
+        }
+
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            background-color: #007bff;
+            color: white;
+            font-size: 1.25rem;
+            text-align: center;
+            padding: 15px;
+        }
+
+        .card-body {
+            background-color: white;
+            padding: 30px;
+        }
+
+        .form-control {
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 1rem;
+        }
+
+        .btn {
+            border-radius: 8px;
+            padding: 10px 20px;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            border: none;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            border: none;
+        }
+
+        .table th, .table td {
+            text-align: center;
+        }
+
+        .result-card {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e9f7fd;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 123, 255, 0.1);
+        }
+
+        .history-table-container {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .history-table-container table {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h4>BMI Calculator</h4>
+            </div>
+            <div class="card-body">
+                <form id="bmiForm">
+                    <div class="mb-3">
+                        <label for="weight" class="form-label">Weight (kg)</label>
+                        <input type="number" id="weight" class="form-control" step="0.1" required placeholder="Enter your weight (30 - 150 kg)">
+                        <div class="invalid-feedback">
+                            Weight must be between 30 kg and 150 kg.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="height" class="form-label">Height (cm)</label>
+                        <input type="number" id="height" class="form-control" step="0.1" required placeholder="Enter your height (140 - 210 cm)">
+                        <div class="invalid-feedback">
+                            Height must be between 140 cm and 210 cm.
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Calculate BMI</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- BMI Calculation Result -->
+        <div id="result" class="result-card d-none">
+            <h5>BMI Calculation Result</h5>
+            <p id="bmiValue"></p>
+            <p id="categoryValue"></p>
+            <p id="changePercentageValue"></p>
+        </div>
+
+        <!-- Load History Button -->
+        <button id="loadHistory" class="btn btn-secondary w-100 mt-3">See The Results!</button>
+
+        <!-- History Table -->
+        <div id="historyTableContainer" class="history-table-container">
+            <table class="table table-bordered mt-4">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Weight</th>
+                        <th>Height</th>
+                        <th>BMI</th>
+                        <th>Category</th>
+                        <th>% Change</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:8000'; 
+
+        // Handle BMI calculation form submission
+        document.getElementById("bmiForm").addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const weight = parseFloat(document.getElementById("weight").value);
+            const height = parseFloat(document.getElementById("height").value);
+
+            // Frontend validation for weight and height
+            if (isNaN(weight) || weight < 30 || weight > 150) {
+                alert("Please enter a valid weight (between 30 kg and 150 kg).");
+                return;
+            }
+            if (isNaN(height) || height < 140 || height > 210) {
+                alert("Please enter a valid height (between 140 cm and 210 cm).");
+                return;
+            }
+
+            // Send the data to the backend API
+            const response = await fetch(`${API_BASE_URL}/calculate-bmi/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ weight, height }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById("result").classList.remove('d-none');
+                document.getElementById("bmiValue").innerText = `BMI: ${data.bmi}`;
+                document.getElementById("categoryValue").innerText = `Category: ${data.category}`;
+                document.getElementById("changePercentageValue").innerText = `Change Percentage: ${data.change_percentage === null ? 'No Change' : data.change_percentage.toFixed(2)}%`;
+            } else {
+                alert("Error calculating BMI");
+            }
+        });
+
+        // Handle history loading
+        document.getElementById("loadHistory").addEventListener("click", async () => {
+            const response = await fetch(`${API_BASE_URL}/bmi-history/`);
+            if (response.ok) {
+                const history = await response.json();
+                const tableBody = document.querySelector("#historyTableContainer tbody");
+                tableBody.innerHTML = ''; // Clear the table before adding new rows
+
+                history.forEach((record) => {
+                    const row = document.createElement("tr");
+                    const changePercentage = record.change_percentage === null ? "No Change" : record.change_percentage.toFixed(2);
+                    row.innerHTML = `
+                        <td>${record.id}</td>
+                        <td>${record.weight}</td>
+                        <td>${record.height}</td>
+                        <td>${record.bmi}</td>
+                        <td>${record.category}</td>
+                        <td>${changePercentage}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+
+                document.getElementById("historyTableContainer").style.display = 'block';
+            } else {
+                alert("Failed to load history.");
+            }
+        });
+    </script>
+
+</body>
+</html>
